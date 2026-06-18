@@ -2,7 +2,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: 'https://barber-api-v1.onrender.com',
 })
 
 // Injeta o token automaticamente em todos os pedidos
