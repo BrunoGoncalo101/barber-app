@@ -508,3 +508,64 @@ input[type="date"] { color-scheme: dark; cursor: pointer; }
 .react-calendar__month-view__days__day--neighboringMonth {
   color: #1a3040;
 }
+
+/* MOBILE */
+@media (max-width: 768px) {
+
+  /* NAV */
+  .home-nav {
+    padding: 12px 16px;
+  }
+
+  .home-nav-links a {
+    display: none;
+  }
+
+  /* HERO */
+  .home-hero {
+    padding: 40px 16px;
+  }
+
+  /* SERVIÇOS */
+  .home-services {
+    padding: 40px 16px;
+  }
+
+  /* SOBRE */
+  .home-about {
+    padding: 40px 16px;
+  }
+
+  .home-about-inner {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  /* LOCAIS */
+  .home-locations {
+    padding: 40px 16px;
+  }
+
+  .locations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* REDES SOCIAIS */
+  .home-socials {
+    padding: 40px 16px;
+  }
+
+  .socials-list {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .social-btn {
+    justify-content: center;
+  }
+
+  /* DASHBOARD */
+  .dashboard-nav {
+    padding: 12px 16px;
+  }
+}

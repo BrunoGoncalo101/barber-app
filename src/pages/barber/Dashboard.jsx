@@ -1,562 +1,185 @@
 // src/pages/barber/Dashboard.jsx
-import { useState, useEffect } from "react";
-import { useAuth } from "../../hooks/useAuth";
-import api from "../../services/api";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
-import localePt from "dayjs/locale/pt";
+import { useState, useEffect } from "react"
+import { useAuth } from "../../hooks/useAuth"
+import api from "../../services/api"
+import dayjs from "../../utils/dayjs"
 import { useNavigate } from 'react-router-dom'
-
-dayjs.locale(localePt);
-dayjs.extend(utc);
-dayjs.extend(timezone);
+import './Dashboard.css'
 
 const statusColor = {
   pending: "#f59e0b",
   confirmed: "#00BFFF",
   cancelled: "#CC2200",
-};
+}
 
 const statusLabel = {
   pending: "Pendente",
   confirmed: "Confirmado",
   cancelled: "Cancelado",
-};
-
+}
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
-  const [appointments, setAppointments] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(
-    dayjs().format("YYYY-MM-DD"),
-  );
-  const [loading, setLoading] = useState(false);
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [appointments, setAppointments] = useState([])
+  const [selectedDate, setSelectedDate] = useState(dayjs().format("YYYY-MM-DD"))
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
     const load = async () => {
-      setLoading(true);
+      setLoading(true)
       try {
-        const { data } = await api.get(`/appointments?date=${selectedDate}`);
-        if (!cancelled) setAppointments(data);
+        const { data } = await api.get(`/appointments?date=${selectedDate}`)
+        if (!cancelled) setAppointments(data)
       } catch (err) {
-        console.error(err);
+        console.error(err)
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoading(false)
       }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedDate]);
+    }
+    load()
+    return () => { cancelled = true }
+  }, [selectedDate])
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:3000");
+    const wsUrl = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace('https://', 'wss://').replace('http://', 'ws://')
+      : 'ws://localhost:3000'
+    const ws = new WebSocket(wsUrl)
     ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
+      const msg = JSON.parse(event.data)
       if (msg.type === "new_appointment") {
-        api
-          .get(`/appointments?date=${selectedDate}`)
-          .then((res) => setAppointments(res.data))
-          .catch((err) => console.error(err));
+        api.get(`/appointments?date=${selectedDate}`)
+          .then(res => setAppointments(res.data))
+          .catch(err => console.error(err))
       }
-    };
-    return () => ws.close();
-  }, [selectedDate]);
+    }
+    return () => ws.close()
+  }, [selectedDate])
 
   const updateStatus = async (id, status) => {
     try {
-      await api.patch(`/appointments/${id}/status`, { status });
-      const { data } = await api.get(`/appointments?date=${selectedDate}`);
-      setAppointments(data);
+      await api.patch(`/appointments/${id}/status`, { status })
+      const { data } = await api.get(`/appointments?date=${selectedDate}`)
+      setAppointments(data)
     } catch (err) {
-      console.error(err);
+      console.error(err)
     }
-  };
+  }
 
-  const prevDay = () =>
-    setSelectedDate(
-      dayjs(selectedDate).subtract(1, "day").format("YYYY-MM-DD"),
-    );
-  const nextDay = () =>
-    setSelectedDate(dayjs(selectedDate).add(1, "day").format("YYYY-MM-DD"));
-  const isToday = selectedDate === dayjs().format("YYYY-MM-DD");
+  const prevDay = () => setSelectedDate(dayjs(selectedDate).subtract(1, "day").format("YYYY-MM-DD"))
+  const nextDay = () => setSelectedDate(dayjs(selectedDate).add(1, "day").format("YYYY-MM-DD"))
+  const isToday = selectedDate === dayjs().format("YYYY-MM-DD")
 
-  // Agrupar por local
   const grouped = appointments.reduce((acc, apt) => {
-    const key = apt.location?.name || "Sem local";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(apt);
-    return acc;
-  }, {});
+    const key = apt.location?.name || "Sem local"
+    if (!acc[key]) acc[key] = []
+    acc[key].push(apt)
+    return acc
+  }, {})
 
-  const navigate = useNavigate()
-  const active = appointments.filter((a) => a.status !== "cancelled");
+  const active = appointments.filter(a => a.status !== "cancelled")
+
+  const counters = [
+    { label: 'Total', value: active.length, color: '#fff' },
+    { label: 'Pendentes', value: appointments.filter(a => a.status === 'pending').length, color: '#f59e0b' },
+    { label: 'Confirmadas', value: appointments.filter(a => a.status === 'confirmed').length, color: '#00BFFF' },
+    { label: 'Receita', value: `${active.reduce((sum, a) => sum + (a.service?.price || 0), 0)}€`, color: '#00BFFF' },
+  ]
 
   return (
-    <div style={{ minHeight: "100vh", background: "#050A0F", color: "#fff" }}>
+    <div className="dashboard">
+
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 32px",
-          borderBottom: "1px solid #0a2030",
-          background: "rgba(5,10,15,.97)",
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-        }}
-      >
+      <div className="dashboard-header">
         <div>
-          <h1
-            style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: 20,
-              fontWeight: 700,
-              color: "#00BFFF",
-              margin: 0,
-            }}
-          >
-            EL CHAPO
-          </h1>
-          <p style={{ color: "#556677", fontSize: 13, margin: 0 }}>
-            Olá, {user?.name}
-          </p>
+          <h1 className="dashboard-header-logo">EL CHAPO</h1>
+          <p className="dashboard-header-sub">Olá, {user?.name}</p>
         </div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-         <button
-    onClick={() => navigate('/')}
-    style={{ color: '#556677', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', transition: 'color .2s' }}
-    onMouseOver={e => e.target.style.color = '#fff'}
-    onMouseOut={e => e.target.style.color = '#556677'}
-  >
-    Voltar
-  </button>
-        <button
-          onClick={logout}
-          style={{
-            color: "#556677",
-            fontSize: 13,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-          }}
-          onMouseOver={(e) => (e.target.style.color = "#fff")}
-          onMouseOut={(e) => (e.target.style.color = "#556677")}
-        >
-          Sair
-        </button>
+        <div className="dashboard-header-actions">
+          <button className="dashboard-header-btn" onClick={() => navigate('/')}>← Home</button>
+          <button className="dashboard-header-btn" onClick={logout}>Sair</button>
         </div>
       </div>
 
-      <div
-        style={{ maxWidth: 640, margin: "0 auto", padding: "24px 24px 48px" }}
-      >
-        {/* Navegação de data */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 8,
-          }}
-        >
-          <button
-            onClick={prevDay}
-            style={{
-              background: "#080D12",
-              border: "1px solid #0a2030",
-              color: "#fff",
-              borderRadius: 8,
-              padding: "8px 14px",
-              cursor: "pointer",
-              fontSize: 16,
-              transition: "border-color .2s",
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.borderColor = "#00BFFF")}
-            onMouseOut={(e) => (e.currentTarget.style.borderColor = "#0a2030")}
-          >
-            ←
-          </button>
-          <div style={{ flex: 1, textAlign: "center" }}>
-            <p
-              style={{
-                fontFamily: "'Playfair Display', serif",
-                fontSize: 18,
-                fontWeight: 700,
-                margin: 0,
-                textTransform: "capitalize",
-              }}
-            >
-              {isToday ? "Hoje" : dayjs(selectedDate).format("dddd")}
-            </p>
-            <p style={{ color: "#556677", fontSize: 13, margin: 0 }}>
-              {dayjs(selectedDate).tz('Europe/Lisbon').format('DD [de] MMMM [de] YYYY')}
-            </p>
+      <div className="dashboard-content">
+
+        {/* Date nav */}
+        <div className="dashboard-date-nav">
+          <button className="dashboard-date-btn" onClick={prevDay}>←</button>
+          <div className="dashboard-date-center">
+            <p className="dashboard-date-day">{isToday ? "Hoje" : dayjs(selectedDate).format("dddd")}</p>
+            <p className="dashboard-date-full">{dayjs(selectedDate).format('DD/MM/YYYY')}</p>
           </div>
-          <button
-            onClick={nextDay}
-            style={{
-              background: "#080D12",
-              border: "1px solid #0a2030",
-              color: "#fff",
-              borderRadius: 8,
-              padding: "8px 14px",
-              cursor: "pointer",
-              fontSize: 16,
-              transition: "border-color .2s",
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.borderColor = "#00BFFF")}
-            onMouseOut={(e) => (e.currentTarget.style.borderColor = "#0a2030")}
-          >
-            →
-          </button>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            style={{ width: "auto", padding: "8px 12px", fontSize: 13 }}
-          />
+          <button className="dashboard-date-btn" onClick={nextDay}>→</button>
         </div>
 
-        {/* Contador */}
+        {/* Counters */}
         {!loading && (
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              marginBottom: 24,
-              flexWrap: "wrap",
-            }}
-          >
-            <div
-              style={{
-                background: "#080D12",
-                border: "1px solid #0a2030",
-                borderRadius: 10,
-                padding: "10px 16px",
-                flex: 1,
-                textAlign: "center",
-              }}
-            >
-              <p
-                style={{
-                  color: "#556677",
-                  fontSize: 11,
-                  letterSpacing: ".1em",
-                  textTransform: "uppercase",
-                  margin: "0 0 2px",
-                }}
-              >
-                Total
-              </p>
-              <p
-                style={{
-                  fontFamily: "'Playfair Display', serif",
-                  fontSize: 22,
-                  fontWeight: 700,
-                  margin: 0,
-                  color: "#fff",
-                }}
-              >
-                {active.length}
-              </p>
-            </div>
-            <div
-              style={{
-                background: "#080D12",
-                border: "1px solid #0a2030",
-                borderRadius: 10,
-                padding: "10px 16px",
-                flex: 1,
-                textAlign: "center",
-              }}
-            >
-              <p
-                style={{
-                  color: "#556677",
-                  fontSize: 11,
-                  letterSpacing: ".1em",
-                  textTransform: "uppercase",
-                  margin: "0 0 2px",
-                }}
-              >
-                Pendentes
-              </p>
-              <p
-                style={{
-                  fontFamily: "'Playfair Display', serif",
-                  fontSize: 22,
-                  fontWeight: 700,
-                  margin: 0,
-                  color: "#f59e0b",
-                }}
-              >
-                {appointments.filter((a) => a.status === "pending").length}
-              </p>
-            </div>
-            <div
-              style={{
-                background: "#080D12",
-                border: "1px solid #0a2030",
-                borderRadius: 10,
-                padding: "10px 16px",
-                flex: 1,
-                textAlign: "center",
-              }}
-            >
-              <p
-                style={{
-                  color: "#556677",
-                  fontSize: 11,
-                  letterSpacing: ".1em",
-                  textTransform: "uppercase",
-                  margin: "0 0 2px",
-                }}
-              >
-                Confirmadas
-              </p>
-              <p
-                style={{
-                  fontFamily: "'Playfair Display', serif",
-                  fontSize: 22,
-                  fontWeight: 700,
-                  margin: 0,
-                  color: "#00BFFF",
-                }}
-              >
-                {appointments.filter((a) => a.status === "confirmed").length}
-              </p>
-            </div>
-            <div
-              style={{
-                background: "#080D12",
-                border: "1px solid #0a2030",
-                borderRadius: 10,
-                padding: "10px 16px",
-                flex: 1,
-                textAlign: "center",
-              }}
-            >
-              <p
-                style={{
-                  color: "#556677",
-                  fontSize: 11,
-                  letterSpacing: ".1em",
-                  textTransform: "uppercase",
-                  margin: "0 0 2px",
-                }}
-              >
-                Receita
-              </p>
-              <p
-                style={{
-                  fontFamily: "'Playfair Display', serif",
-                  fontSize: 22,
-                  fontWeight: 700,
-                  margin: 0,
-                  color: "#00BFFF",
-                }}
-              >
-                {active.reduce((sum, a) => sum + (a.service?.price || 0), 0)}€
-              </p>
-            </div>
+          <div className="dashboard-counters">
+            {counters.map(item => (
+              <div key={item.label} className="dashboard-counter-card">
+                <p className="dashboard-counter-label">{item.label}</p>
+                <p className="dashboard-counter-value" style={{ color: item.color }}>{item.value}</p>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Lista agrupada por local */}
+        {/* List */}
         {loading ? (
           <p className="loading">A carregar...</p>
         ) : appointments.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "48px 0" }}>
-            <p style={{ fontSize: 32, marginBottom: 8 }}>✂️</p>
-            <p style={{ color: "#556677", fontSize: 14 }}>
-              Sem marcações para este dia.
-            </p>
+          <div className="dashboard-empty">
+            <p className="dashboard-empty-icon">✂️</p>
+            <p className="dashboard-empty-text">Sem marcações para este dia.</p>
           </div>
         ) : (
           Object.entries(grouped).map(([locationName, apts]) => (
-            <div key={locationName} style={{ marginBottom: 32 }}>
-              {/* Label do local */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 12,
-                }}
-              >
-                <span style={{ fontSize: 14 }}>📍</span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#00BFFF",
-                    letterSpacing: ".05em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {locationName}
-                </span>
-                <div style={{ flex: 1, height: 1, background: "#0a2030" }} />
-                <span style={{ color: "#556677", fontSize: 12 }}>
-                  {apts.filter((a) => a.status !== "cancelled").length}{" "}
-                  marcações
+            <div key={locationName} className="dashboard-location-group">
+              <div className="dashboard-location-header">
+                <span>📍</span>
+                <span className="dashboard-location-name">{locationName}</span>
+                <div className="dashboard-location-divider" />
+                <span className="dashboard-location-count">
+                  {apts.filter(a => a.status !== "cancelled").length} marcações
                 </span>
               </div>
 
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 10 }}
-              >
-                {apts.map((apt) => (
-                  <div
-                    key={apt._id}
-                    style={{
-                      background: "#080D12",
-                      border: `1px solid ${apt.status === "cancelled" ? "#1a0a0a" : "#0a2030"}`,
-                      borderRadius: 14,
-                      padding: 18,
-                      opacity: apt.status === "cancelled" ? 0.5 : 1,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: 10,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontFamily: "'Playfair Display', serif",
-                          fontSize: 17,
-                          fontWeight: 700,
-                          color:
-                            apt.status === "cancelled" ? "#556677" : "#fff",
-                        }}
-                      >
+              <div className="dashboard-appointments">
+                {apts.map(apt => (
+                  <div key={apt._id} className={`dashboard-apt-card ${apt.status === 'cancelled' ? 'cancelled' : ''}`}>
+
+                    <div className="dashboard-apt-top">
+                      <span className={`dashboard-apt-time ${apt.status === 'cancelled' ? 'cancelled' : ''}`}>
                         {dayjs(apt.startTime).tz('Europe/Lisbon').format('HH:mm')}
-                        <span style={{ color: "#334455", fontWeight: 400 }}>
-                          {" "}
-                          —{" "}
-                        </span>
+                        <span className="dashboard-apt-time-sep"> — </span>
                         {dayjs(apt.endTime).tz('Europe/Lisbon').format('HH:mm')}
-                        <span style={{ color: "#334455", fontWeight: 400 }}>
-                          {" "}
-                        </span>
                       </span>
                       <span
+                        className="dashboard-apt-status"
                         style={{
-                          fontSize: 11,
-                          padding: "3px 10px",
-                          borderRadius: 50,
-                          fontWeight: 600,
                           background: statusColor[apt.status] + "22",
                           color: statusColor[apt.status],
-                          border: `1px solid ${statusColor[apt.status]}44`,
+                          border: `1px solid ${statusColor[apt.status]}44`
                         }}
                       >
                         {statusLabel[apt.status]}
                       </span>
                     </div>
 
-                    <p
-                      style={{
-                        fontWeight: 600,
-                        fontSize: 15,
-                        margin: "0 0 2px",
-                      }}
-                    >
-                      {apt.clientName}
+                    <p className="dashboard-apt-name">{apt.clientName}</p>
+                    <p className="dashboard-apt-phone">{apt.clientPhone}</p>
+                    <p className="dashboard-apt-service">
+                      {apt.service?.name} — <span className="dashboard-apt-price">{apt.service?.price}€</span>
                     </p>
-                    <p
-                      style={{
-                        color: "#556677",
-                        fontSize: 13,
-                        margin: "0 0 2px",
-                      }}
-                    >
-                      {apt.clientPhone}
-                    </p>
-                    <p
-                      style={{
-                        color: "#556677",
-                        fontSize: 13,
-                        margin: 0,
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      {apt.service?.name} —{" "}
-                      <span style={{ color: "#00BFFF" }}>
-                        {apt.service?.price}€
-                      </span>
-                    </p>
-                    {apt.notes && (
-                      <p
-                        style={{
-                          color: "#445566",
-                          fontSize: 13,
-                          margin: "8px 0 0",
-                          fontStyle: "italic",
-                        }}
-                      >
-                        "{apt.notes}"
-                      </p>
-                    )}
+                    {apt.notes && <p className="dashboard-apt-notes">"{apt.notes}"</p>}
 
                     {apt.status === "pending" && (
-                      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                        <button
-                          onClick={() => updateStatus(apt._id, "confirmed")}
-                          style={{
-                            background: "#001a0d",
-                            border: "1px solid #00BFFF44",
-                            color: "#00BFFF",
-                            fontSize: 13,
-                            fontWeight: 600,
-                            padding: "7px 16px",
-                            borderRadius: 8,
-                            cursor: "pointer",
-                            transition: "all .2s",
-                            flex: 1,
-                          }}
-                          onMouseOver={(e) =>
-                            (e.currentTarget.style.background = "#002a1a")
-                          }
-                          onMouseOut={(e) =>
-                            (e.currentTarget.style.background = "#001a0d")
-                          }
-                        >
-                          ✓ Confirmar
-                        </button>
-                        <button
-                          onClick={() => updateStatus(apt._id, "cancelled")}
-                          style={{
-                            background: "#1a0000",
-                            border: "1px solid #CC220044",
-                            color: "#CC2200",
-                            fontSize: 13,
-                            fontWeight: 600,
-                            padding: "7px 16px",
-                            borderRadius: 8,
-                            cursor: "pointer",
-                            transition: "all .2s",
-                            flex: 1,
-                          }}
-                          onMouseOver={(e) =>
-                            (e.currentTarget.style.background = "#2a0000")
-                          }
-                          onMouseOut={(e) =>
-                            (e.currentTarget.style.background = "#1a0000")
-                          }
-                        >
-                          ✕ Cancelar
-                        </button>
+                      <div className="dashboard-apt-actions">
+                        <button className="dashboard-apt-confirm" onClick={() => updateStatus(apt._id, "confirmed")}>✓ Confirmar</button>
+                        <button className="dashboard-apt-cancel" onClick={() => updateStatus(apt._id, "cancelled")}>✕ Cancelar</button>
                       </div>
                     )}
                   </div>
@@ -567,5 +190,5 @@ export default function Dashboard() {
         )}
       </div>
     </div>
-  );
+  )
 }
